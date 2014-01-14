@@ -1,22 +1,83 @@
-library(ggplot2)
+## "Long" format charts
+## these won't work for 'first' and 'second'
+## instead use fbHist(second.long)
 
-## "Long" format data
+### Histogram
+### works for both experiments, though the different groups are confounding
+fbHist <- function(df) {
+  # drop initital for diffs
+  df <- df[df[, 'Stage'] != 'Initial', ]
+  p <- ggplot(data = df) +
+    geom_histogram(aes(x = abs_diff, fill = Stage), alpha = 0.6) +
+    geom_vline(xintercept = 0, colour = 'red', linetype = 'dashed') +
+    guides(fill = FALSE) +
+    xlab('Absolute change in Female Friends') + ylab('') +
+    facet_grid(Stage ~ user.group)
+  return(p)
+}
 
-box.p <- ggplot(data = subjects.long) +
-  geom_boxplot(aes(x = Type, y = Female.prop, fill = Type)) +
-  facet_wrap(~ Time) +
-  ylab('Proportion of Female Friends') + xlab('') +
-  ggtitle('Control and Treatment Groups, Before and After Experiment')
+### Density estimator
 
-## Descriptive charts
+fbDens <- function(df) {
+  # drop initital for diffs
+  df <- df[df[, 'Stage'] != 'Initial', ]
+  p <- ggplot(data = df) +
+    geom_density(aes(x = abs_diff, fill = Stage), alpha = 0.6) +
+    geom_vline(xintercept = 0, colour = 'red', linetype = 'dashed') +
+    guides(fill = FALSE) +
+    xlab('Absolute change in Female Friends') + ylab('') +
+    facet_grid(Stage ~ user.group)
+  return(p)
+}
 
-prop.p <- ggplot(data = subjects.long) +
-  geom_density(aes(x = Female.prop, fill = Type), alpha = 0.4) +
-  xlab('Proportion of Female Friends') + ylab('')
-count.p <- ggplot(data = subjects.long) +
-  geom_histogram(aes(x = friends, fill = Type), alpha = 0.4, binwidth = 100) +
-  xlab('Total Number of Friends')
-### Another look at the count
-points.p <- ggplot(data = subjects.long) +
-  geom_point(aes(x = friends, y = Female.prop, colour = Type)) +
-  xlab('Total Number of Friends') + ylab('Proportion of Female Friends')
+### Yay, boxplots
+
+fbBox <- function(df) {
+  # drop initital for diffs
+  df <- df[df[, 'Stage'] != 'Initial', ]
+  p <- ggplot(data = df) +
+    geom_boxplot(aes(x = Stage, y = abs_diff, fill = user.group)) +
+    ylab('Absolute Change in Female Friends') + xlab('Stage') +
+    scale_fill_discrete(name = 'Group')
+  return(p)
+}
+
+### Plot proportion against absolute change
+### Not super helpful, but it can offer some indication as to
+### how heavily very active users impacted the outcome
+# as indicated by friends at the outset
+absVsInit <- function(df) {
+  p <- ggplot(data = na.omit(df), aes(
+    x = init_tot,
+    y = abs_diff,
+    colour = user.group
+  )) +
+    geom_point() + geom_smooth(method = 'lm') +
+    facet_grid(Stage ~ .) +
+    ylim(-100, 150) + xlim(0, 4000) +
+    xlab('Initial Total Friends') +
+    ylab('Absolute Change in Female Friends')
+  return(p)
+}
+
+## 'Wide' format charts
+
+# actions only works for the second experiment
+fbActions <- function() {
+  df <- second
+  apu <- quantile(df[, 'user.total_actions'])
+  df[, 'Actions Per User'] <- cut(
+    df[, 'user.total_actions'],
+    breaks = unname(apu),
+    labels = names(apu)[-1]
+  )
+  # Drop NA values introduced by cut()
+  p <- ggplot(data = na.omit(df)) +
+    # don't split by control/treatment as we actions
+    # for control group don't vary (it's part of treatment)
+    geom_boxplot(aes(x = `Actions Per User`, y = X2fb.ff_abs)) +
+    ylab('Change in Female Friends') +
+    xlab('Percentile of User Actions') +
+    ggtitle('Users interacting more heavily with FollowBias show greater change')
+  return(p)
+}

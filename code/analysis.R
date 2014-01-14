@@ -4,60 +4,87 @@
 ## but we'll likely use the 'wide' dataset
 
 
-# Analysis of variance will have problems if the group sizes are too different
-# so select a subset of the treatment group to compare to the control
-balanced <- function() {
-  df <- fb.init
-  # Difference in proportion of female friends from start to end of experiment 
-  df[, "fromFirst"] <- with(df, female_last / friends_last - female_first / friends_first)
-  ct <- df[df[, "Type"] == "Control", ]
-  tr <- df[df[, "Type"] == "Treatment", ]
-  tr <- tr[sample(1:nrow(tr), nrow(ct)), ]
-  g <- lm(fromFirst ~ Type, rbind(ct, tr))
-  return(g)
-}
-
-summary(balanced())
-
-balancedSecond <- function(type) {
-  df <- fb.second
-
-  df[, 'propFirst'] <- with(
-    df,
-    ffb.female / (ffb.male + ffb.female + ffb.unknown)
-  )
-  df[, 'propLast'] <- with(
-    df,
-    efb.female / (efb.male + efb.female + efb.unknown)
-  )
-  ct <- df[df[, "Type"] == "Control", ]
-  tr <- df[df[, "Type"] == "Treatment", ]
-  tr <- tr[sample(1:nrow(tr), nrow(ct)), ]
-  if (type == 'prop') {
-    g <- lm(propLast - propFirst ~ Type, rbind(ct, tr))
-  } else {
-    g <- lm(efb.female - ffb.female ~ Type + I(ffb.male + ffb.female + ffb.unknown), rbind(ct, tr))
+# Difference in female friends from start to end of experiment
+diffStagger <- function(df, select, long = FALSE) {
+  # use a list to collect values
+  res <- list()
+  # first values can be computed outside the loop
+  names.first <- str_c('ffb', c('male', 'female', 'unknown'), sep = '.')
+  tot.init <- rowSums(df[, names.first], na.rm = TRUE)
+  for (i in select) {
+    # absolute and proportional differences
+    abs.name <- str_c(i, 'ff_abs', sep = '.')
+    prop.name <- str_c(i, 'ff_prop', sep = '.')
+    names.i <- str_c(i, c('male', 'female', 'unknown'), sep = '.')
+    tot.i <- rowSums(df[, names.i], na.rm = TRUE)
+    # average both initital and 'current' total friends
+    prop.mean <- rowMeans(cbind(tot.init, tot.i), na.rm = TRUE)
+    # cache 'current' female friends
+    current <- df[, str_c(i, '.female')]
+    # compute average and absolute differences from start of experiment
+    res[[prop.name]] <- (current - df[, 'ffb.female']) / prop.mean
+    res[[abs.name]] <- current - df[, 'ffb.female']
   }
-  
-  return(g)
+  res <- as.data.frame(res)
+  if (long) {
+    s.prop <- stack(res, select = names(res)[grep('prop', names(res))])
+    s.abs <- stack(res, select = names(res)[grep('abs', names(res))])
+    out <- data.frame(
+      user.id = df[, 'user.id'],
+      Stage = sub('\\..*$', '', s.abs[, 'ind']),
+      prop_diff = s.prop[, 'values'],
+      abs_diff = s.abs[, 'values'],
+      init_tot = tot.init
+    )
+    return(out)
+  } else {
+    # Add initital total so it's easier to get later
+    res[, 'init_tot'] <- tot.init
+    return(res)
+  }
 }
 
+second <- cbind(second, diffStagger(second, c('lfb', 'X1fb', 'X2fb')))
+first <- cbind(first, diffStagger(first, c('lfb', 'X1fb', 'X3fb')))
 
-# Tiny bootstrap
+# A little trickier to merge to the 'long' format because diffs don't exist
+# for the first snapshot
 
-second.boot <- function(type = 'prop') {
-  res <- replicate(200, balancedSecond(type)$coefficients)
-  # we resample the treatment group, not the control
+second.long <- rbind(
   data.frame(
-    # Add in a factor to make plotting a bit easier with ggplot
-    Type = 'Treatment',
-    Difference = res[2, ] - res[1, 1]
+    second.long[second.long[, 'Stage'] == 'ffb', ],
+    abs_diff = NA,
+    prop_diff = NA,
+    init_tot = second[, 'init_tot']
+  ),
+  merge(
+    second.long,
+    diffStagger(second, c('lfb', 'X1fb', 'X2fb'), long = TRUE),
+    all.y = TRUE, by.x = c('user.id', 'Stage')
   )
-}
-balanced.out <- second.boot()
+)
+first.long <- rbind(
+  data.frame(
+    first.long[first.long[, 'Stage'] == 'ffb', ],
+    abs_diff = NA,
+    prop_diff = NA,
+    init_tot = first[, 'init_tot']
+  ),
+  merge(
+    first.long,
+    diffStagger(first, c('lfb', 'X1fb', 'X3fb'), long = TRUE),
+    all.y = TRUE, by.x = c('user.id', 'Stage')
+  )
+)
 
-
-# instead of comparing just the difference, compare the eventual proportion
-# to the initial proportion
-withInit <- lm(female_last / friends_last ~ Type + I(female_first / friends_first), data = subjects)
+first.long[, 'Stage'] <- factor(
+  first.long[, 'Stage'],
+  labels = c('Initial', 'Login', 'End', 'Followup'),
+  ordered = TRUE
+)
+second.long[, 'Stage'] <- factor(
+  second.long[, 'Stage'],
+  labels = c('Initial', 'Login', 'End', 'Followup'),
+  ordered = TRUE
+)
 
