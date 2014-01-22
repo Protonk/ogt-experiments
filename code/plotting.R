@@ -37,7 +37,8 @@ fbBox <- function(df) {
   df <- df[df[, 'Stage'] != 'Initial', ]
   p <- ggplot(data = df) +
     geom_boxplot(aes(x = Stage, y = abs_diff, fill = user.group)) +
-    ylab('Absolute Change in Female Friends') + xlab('Stage') +
+    ylab('Absolute Change in Female Friends') + xlab('') +
+    ggtitle('Net Change in Female Friends over the Experiment')
     scale_fill_discrete(name = 'Group')
   return(p)
 }
@@ -96,4 +97,35 @@ modelFx <- function() {
   return(p)
 }
 modelFx()
+
+## Plots for organizations
+
+fbOrgs <- function() {
+  org.chart <- ggplot(data = gen.long, aes(x = Organization, fill = Gender, y = Staff)) +
+    geom_bar(
+      stat = 'identity',
+      position = 'dodge'
+    ) + 
+    xlab('') + ylab('') +
+    scale_fill_manual(values = c('#66aa66', '#ddaa44')) +
+    guides(
+      fill = guide_legend(
+        title = NULL,
+        label.theme = element_text(angle = 0, size = 9)
+      )
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 0.65, size = 7.5),
+      axis.text.y = element_text(angle = 0, size = 9),
+      legend.justification = c(1, 1),
+      legend.position = c(1, 1),
+      legend.key.size = unit(0.4, "cm"),
+      legend.background = element_blank()
+    )
+  
+  return(org.chart)  
+}
+
+## Saving charts (may get noisy for dropbox)
+ggsave(filename = 'plots/staff_final.pdf', plot = org.chart, width = 3.31, height = 4.4, units = 'in')
 

@@ -3,6 +3,7 @@
 library(ggplot2)
 library(plyr)
 library(stringr)
+library(reshape2)
 
 ## Import initial and second experiment
 
@@ -74,3 +75,36 @@ toLong <- function(df, observables = c("female", "male", "unknown")) {
 
 first.long <- toLong(first)
 second.long <- toLong(second)
+
+### Import population data
+
+jr.interact <- read.csv(file.path(getwd(), 'data', 'population', 'journo_data.csv'), na.strings = c("NA", "#N/A", "<NA>", ""), as.is = TRUE)
+
+jr.factors <- c('screen_name', 'gender', 'orgs')
+jr.obs <- c("follow.female", "follow.male", "follow.unknown", 
+            "follow.total",
+            "interactions.female", "interactions.male", "interactions.unknown", 
+            "interactions.total")
+
+prune <- function(df) {
+  collect <- lapply(df, function(x) {
+    return(which(!grepl('^[0-9]*$', x))) 
+  })
+  return(unique(unlist(collect)))
+}
+
+jr.interact <- jr.interact[-prune(jr.interact[, 'follow.female']), ]
+jr.interact[, 'gender'] <- str_trim(jr.interact[, 'gender'])
+jr.interact[, jr.obs] <- lapply(jr.interact[, jr.obs], as.numeric)
+
+dupMulti <- function(df = jr.interact, sep = ';', col = 'orgs') {
+  dups <- df[str_detect(df[, col], sep), ]
+  nonDups <- df[!str_detect(df[, col], sep), ]
+  splitVal <- str_split(dups[, col], sep)
+  r.df <- dups
+  dups[, col] <- sapply(splitVal, `[[`, 1)
+  r.df[, col] <- sapply(splitVal, `[[`, 2)
+  return(rbind(nonDups, dups, r.df))
+}
+
+jr.interact <- dupMulti()
