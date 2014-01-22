@@ -1,6 +1,7 @@
 ## add dependencies 
 
 library(ggplot2)
+library(plyr)
 library(stringr)
 
 ## Import initial and second experiment
@@ -12,7 +13,8 @@ fbImport <- function(fpath) {
     as.is = TRUE
   )
   coln <- names(df)
-
+  # remove survey data for now
+  df <- df[, grep('fb\\.|user\\.', coln)]
   # 'Incomplete isn't a different treatment, just a marker of missingness
   test.grp <- df[, 'user.group']
   # Add column for missingness if we want it
@@ -27,14 +29,13 @@ fbImport <- function(fpath) {
     'Test',
     'Control'
   )
-  dated <- grepl('date', coln)
-  df <- cbind(df[, !dated], as.data.frame(lapply(df[, dated], as.Date)))
+
   return(df)
 }
 # Your path here may be different. If so, either change this or
 # move the data into the folder containing the import script
 first <- fbImport(file.path(getwd(), 'data', 'fb-initial', 'results.csv'))
-second <- fbImport(file.path(getwd(), 'data', 'fb-second', 'results.csv'))
+second <- fbImport(file.path(getwd(), 'data', 'fb-second', 'results_update.csv'))
 
 
 toLong <- function(df, observables = c("female", "male", "unknown")) {

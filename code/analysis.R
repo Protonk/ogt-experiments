@@ -44,7 +44,7 @@ diffStagger <- function(df, select, long = FALSE) {
   }
 }
 
-second <- cbind(second, diffStagger(second, c('lfb', 'X1fb', 'X2fb')))
+second <- cbind(second, diffStagger(second, c('lfb', 'X1fb', 'X2fb', 'X3fb')))
 first <- cbind(first, diffStagger(first, c('lfb', 'X1fb', 'X3fb')))
 
 # A little trickier to merge to the 'long' format because diffs don't exist
@@ -59,7 +59,7 @@ second.long <- rbind(
   ),
   merge(
     second.long,
-    diffStagger(second, c('lfb', 'X1fb', 'X2fb'), long = TRUE),
+    diffStagger(second, c('lfb', 'X1fb', 'X2fb', 'X3fb'), long = TRUE),
     all.y = TRUE, by.x = c('user.id', 'Stage')
   )
 )
@@ -84,7 +84,35 @@ first.long[, 'Stage'] <- factor(
 )
 second.long[, 'Stage'] <- factor(
   second.long[, 'Stage'],
-  labels = c('Initial', 'Login', 'End', 'Followup'),
+  labels = c('Initial', 'Login', 'End', 'First Followup', 'Second Followup'),
   ordered = TRUE
 )
+
+
+timeScale <- function(df = second, stages = c('lfb', 'X1fb', 'X2fb', 'X3fb'), labels = c('Login', 'End', 'First Followup', 'Second Followup')) {
+  stageList <- str_c(stages, '.ff_abs')
+  group.labels <- c('Control', 'Treatment', 'Initial Friends')
+  coefN <- c('Estimate', 'Standard Error', 'T Value', 'P value')
+  
+  models <- lapply(stageList, function(x) {
+    form <- substitute(
+      i ~ user.group + init_tot,
+      list(i = as.name(x))
+    )
+    fb.model <- lm(form, data = df)
+    coefAll <- summary(fb.model)$coefficients
+    est <- coefAll[, 'Estimate']
+    colnames(coefAll) <- coefN
+    output <- data.frame(
+      Parameters = group.labels,
+      Stage = labels[stageList %in% x],
+      Estimate = coefAll[, 'Estimate'],
+      Upper = coefAll[, 'Estimate'] + coefAll[, 'Standard Error'],
+      Lower = coefAll[, 'Estimate'] - coefAll[, 'Standard Error']  
+    )
+    return(output)
+  })
+  return(ldply(models))
+}
+model.time <- timeScale()
 

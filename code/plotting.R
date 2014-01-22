@@ -81,3 +81,19 @@ fbActions <- function() {
     ggtitle('Users interacting more heavily with FollowBias show greater change')
   return(p)
 }
+
+### plots for models
+
+df.plot <- subset(model.time, Parameters %in% c('Control', 'Treatment'))
+df.plot[, 'Parameters'] <- as.character(df.plot[, 'Parameters'])
+modelFx <- function() {
+  p <- ggplot(data = df.plot, aes(x = as.numeric(Stage))) +
+    geom_line(aes(y = Estimate, colour = Parameters, group = Parameters), size = 1.5) +
+    geom_ribbon(aes(ymax = Upper, ymin = Lower, group = Parameters, fill = Parameters), alpha = 0.3) +
+    xlab('Stages') + ylab('Point Estimate') +
+    scale_x_continuous(breaks = 1:4, labels = c('Login', 'End', 'First Followup', 'Second Followup')) +
+    ggtitle('Estimated Effect of Treatment Corrected for Initial Total Friends')
+  return(p)
+}
+modelFx()
+
